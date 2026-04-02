@@ -1,0 +1,11 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -workspace ios/RupeeLensAI.xcworkspace -scheme RupeeLensAI -destination id=720B14D2-0AF0-4983-80D3-9D61F0EC4B0C
+
+2026-03-31 14:03:13.803 xcodebuild[57467:5100602] Writing error result bundle to /var/folders/wg/p_0rtyp50xg8nlpsmb_nm9zh0000gn/T/ResultBundle_2026-31-03_14-03-0013.xcresult
+xcodebuild: error: Unable to find a destination matching the provided destination specifier:
+		{ id:720B14D2-0AF0-4983-80D3-9D61F0EC4B0C }
+
+	Ineligible destinations for the "RupeeLensAI" scheme:
+		{ platform:iOS, id:dvtdevice-DVTiPhonePlaceholder-iphoneos:placeholder, name:Any iOS Device, error:iOS 26.2 is not installed. Please download and install the platform from Xcode > Settings > Components. }
+		{ platform:iOS, id:00008101-000515812E22001E, name:CrestAdmin’s iPhone, error:iOS 26.2 is not installed. Please download and install the platform from Xcode > Settings > Components. }
+		{ platform:iOS, id:b47bda117bf743802c0512d601649f4505fbb5df, name:Saurabh's iPad, error:iOS 26.2 is not installed. Please download and install the platform from Xcode > Settings > Components. }
