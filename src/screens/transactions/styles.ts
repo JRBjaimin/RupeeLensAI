@@ -50,6 +50,24 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
   },
+  syncButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(53,201,255,0.5)',
+    backgroundColor: 'rgba(53,201,255,0.15)',
+  },
+  syncButtonDisabled: {
+    borderColor: 'rgba(140,150,170,0.3)',
+    backgroundColor: 'rgba(140,150,170,0.1)',
+  },
+  syncText: {
+    color: colors.textPrimary,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
   avatarRing: {
     width: 32,
     height: 32,

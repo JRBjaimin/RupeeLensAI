@@ -41,6 +41,32 @@ export const getTransactions = async (): Promise<Transaction[]> => {
   return rows.map(mapRowToTransaction);
 };
 
+export const hasTransactionBySourceRaw = async (
+  source: Transaction['source'],
+  rawText: string
+) => {
+  const result = await db.executeAsync(
+    `SELECT id FROM transactions WHERE source = ? AND raw_text = ? LIMIT 1`,
+    [source, rawText]
+  );
+  const rows = result.results ?? [];
+  return rows.length > 0;
+};
+
+export const addTransactionsIfMissing = async (txns: NewTransactionInput[]) => {
+  const inserted: Transaction[] = [];
+  for (const txn of txns) {
+    const rawText = txn.rawText ?? '';
+    if (rawText) {
+      const exists = await hasTransactionBySourceRaw(txn.source, rawText);
+      if (exists) continue;
+    }
+    const created = await addTransaction(txn);
+    inserted.push(created);
+  }
+  return inserted;
+};
+
 export const getTransactionsByDateRange = async (
   startDate: string,
   endDate: string

@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   Image,
+  Linking,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -17,6 +20,9 @@ import { CalendarIcon, DatePickerModal } from '../../components/common';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { readSmsAndIngest } from '../../services/smsService';
 import { useAppStore } from '../../store/useAppStore';
+import { db } from '../../db/database';
+import { syncGmailTransactions } from '../../services/gmail/gmailIngestService';
+import { ENV } from '../../config/env';
 
 const imgArjun = require('../../assets/images/profile/arjun.png');
 const imgEdit = require('../../assets/images/profile/edit.png');
@@ -26,13 +32,24 @@ const imgConnect = require('../../assets/images/profile/connect.png');
 const imgGoogle = require('../../assets/images/profile/google.png');
 const imgSms = require('../../assets/images/profile/sms.png');
 
+const defaultProfile = {
+  name: 'Arjun Mehta',
+  email: 'arjun.mehta@quantum-finance.io',
+  phone: '+91 98765 43210',
+  city: 'Mumbai',
+  avatarUri: undefined,
+  dob: '12/08/1994',
+};
+
 const ProfileScreen = () => {
-  const { profile, updateProfile } = useProfileStore();
+  const { profile, updateProfile, resetProfile } = useProfileStore();
   const { status, requestAll } = usePermissionStore();
   const { loadTransactions } = useAppStore();
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(profile);
   const [showPicker, setShowPicker] = useState(false);
+  const [gmailSyncing, setGmailSyncing] = useState(false);
+  const [gmailLastSync, setGmailLastSync] = useState<string | null>(null);
 
   const startEdit = () => {
     setDraft(profile);
@@ -50,6 +67,36 @@ const ProfileScreen = () => {
   };
 
   const avatarSource = draft.avatarUri ? { uri: draft.avatarUri } : imgArjun;
+
+  const handleDeleteAllData = () => {
+    Alert.alert(
+      'Delete all data?',
+      'This will permanently remove all transactions, insights, and recurring patterns from this device. Your profile will be reset to default values. System permissions remain unchanged.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await db.executeAsync('DELETE FROM transactions');
+            await db.executeAsync('DELETE FROM insights');
+            await db.executeAsync('DELETE FROM recurring_patterns');
+            await db.executeAsync('DELETE FROM rules');
+            resetProfile();
+            setDraft(defaultProfile);
+            await loadTransactions();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleManageLocalStorage = () => {
+    Alert.alert(
+      'Local storage',
+      'This will let you review on-device data size, clear cached files, and manage retention. We will wire this in a later phase.'
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -242,10 +289,13 @@ const ProfileScreen = () => {
           <View style={styles.dataSourcesCard}>
             <View style={styles.dataSourcesHeader}>
               <Text style={styles.dataSourcesTitle}>Data Feed{`\n`}Sources</Text>
-              <View style={styles.connectButton}>
+              <Pressable
+                style={styles.connectButton}
+                onPress={() => Linking.openURL(ENV.GMAIL_AUTH_URL)}
+              >
                 <Image source={imgConnect} style={styles.connectIcon} />
                 <Text style={styles.connectText}>CONNECT{`\n`}NEW</Text>
-              </View>
+              </Pressable>
             </View>
             <View style={styles.sourceCard}>
               <View style={styles.sourceInfo}>
@@ -254,12 +304,32 @@ const ProfileScreen = () => {
                 </View>
                 <View>
                   <Text style={styles.sourceTitle}>Google{`\n`}Workspace</Text>
-                  <Text style={styles.sourceMeta}>Last sync: 2 mins{`\n`}ago</Text>
+                  <Text style={styles.sourceMeta}>
+                    Last sync:{` `}
+                    {gmailLastSync ?? 'Not connected'}
+                  </Text>
                 </View>
               </View>
-              <View style={styles.activePill}>
-                <Text style={styles.activeText}>ACTIVE</Text>
-              </View>
+              <Pressable
+                style={styles.syncPill}
+                disabled={gmailSyncing}
+                onPress={async () => {
+                  setGmailSyncing(true);
+                  try {
+                    await syncGmailTransactions();
+                    await loadTransactions();
+                    setGmailLastSync('Just now');
+                  } catch (error: any) {
+                    Alert.alert('Gmail sync failed', error?.message ?? 'Try again.');
+                  } finally {
+                    setGmailSyncing(false);
+                  }
+                }}
+              >
+                <Text style={styles.syncText}>
+                  {gmailSyncing ? 'SYNCING' : 'SYNC'}
+                </Text>
+              </Pressable>
             </View>
             <View style={styles.sourceCard}>
               <View style={styles.sourceInfo}>
@@ -288,6 +358,19 @@ const ProfileScreen = () => {
                 </View>
               )}
             </View>
+            <Pressable
+              style={[
+                styles.primaryAction,
+                (Platform.OS !== 'android' || !isGranted(status.sms)) && styles.disabledAction,
+              ]}
+              onPress={async () => {
+                if (Platform.OS !== 'android' || !isGranted(status.sms)) return;
+                await readSmsAndIngest(100);
+                await loadTransactions();
+              }}
+            >
+              <Text style={styles.primaryActionText}>Sync SMS Now</Text>
+            </Pressable>
           </View>
 
           <View style={styles.privacyCard}>
@@ -297,12 +380,12 @@ const ProfileScreen = () => {
               encrypted.
             </Text>
             <View style={styles.privacyActions}>
-              <View style={styles.primaryAction}>
+              <Pressable style={styles.primaryAction} onPress={handleManageLocalStorage}>
                 <Text style={styles.primaryActionText}>Manage Local Storage</Text>
-              </View>
-              <View style={styles.dangerAction}>
+              </Pressable>
+              <Pressable style={styles.dangerAction} onPress={handleDeleteAllData}>
                 <Text style={styles.dangerActionText}>Delete All Data</Text>
-              </View>
+              </Pressable>
             </View>
           </View>
         </ScrollView>

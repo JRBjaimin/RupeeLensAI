@@ -17,9 +17,9 @@
 3. ~~Dashboard: “View All” should navigate to Transactions.~~
 4. ~~Insights: list cards should be clickable to Intelligence Feed.~~
 5. ~~Profile: make permissions + data sources dynamic (toggle states, source status).~~
-6. Add Expense: validate inputs + category picker (optional).
-7. ~~SMS parsing (Phase 2)~~ and email parsing (Phase 4) per docs.
-8. Insight engine rules expansion (Phase 3) + persist insights in DB.
+6. ~~Add Expense: validate inputs + category picker (optional).~~
+7. ~~SMS parsing (Phase 2)~~ and email parsing (Phase 4) per docs (started).
+8. ~~Insight engine rules expansion (Phase 3) + persist insights in DB.~~
 
 ## Proposed Phases
 
@@ -35,15 +35,15 @@
 - ~~Integrate SMS parsing pipeline (Android only).~~
 - ~~Add manual source status into Profile (mocked at first).~~
 
-### Phase 3: Insight Engine Expansion (In Progress)
+### ~~Phase 3: Insight Engine Expansion (Completed)~~
 
 - Rules engine (food spike, subscriptions, recurring detection).
 - Store insights in DB and render from DB.
 
-### Phase 4: Email Parsing (Backend)
+### Phase 4: Email Parsing (Backend) (In Progress)
 
-- Add backend pipeline for Gmail API.
-- Sync insights back to app.
+- Add backend pipeline for Gmail API. (done: backend skeleton + Gmail sync endpoint)
+- Sync insights back to app. (done: app Gmail sync + local insight refresh)
 
 ## Immediate Next Step Suggestion
 

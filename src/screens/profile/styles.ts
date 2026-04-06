@@ -615,6 +615,9 @@ export const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: 'rgba(159,167,255,0.2)',
   },
+  disabledAction: {
+    opacity: 0.5,
+  },
   primaryActionText: {
     color: '#9fa7ff',
     fontSize: 12,

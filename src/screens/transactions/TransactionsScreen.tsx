@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { SafeAreaView, ScrollView, Text, View } from 'react-native';
+import { Platform, Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native';
 import AppHeader from '../../components/AppHeader';
 import { styles } from './styles';
 import {
@@ -20,6 +20,9 @@ import {
 } from '../../components/transactions';
 import { useAppStore } from '../../store/useAppStore';
 import { AddExpenseHeaderButton } from '../../components/addExpense';
+import { readSmsAndIngest } from '../../services/smsService';
+import { usePermissionStore } from '../../store/usePermissionStore';
+import { isGranted } from '../../services/permissionService';
 
 
 type TimeFilter = 'Today' | 'Week' | 'Month';
@@ -31,6 +34,7 @@ type TransactionsScreenProps = {
 const TransactionsScreen = ({ onOpenAddExpense }: TransactionsScreenProps) => {
   const { transactions, loadTransactions } = useAppStore();
   const [filter, setFilter] = useState<TimeFilter>('Today');
+  const permissionStatus = usePermissionStore((s) => s.status);
 
   React.useEffect(() => {
     loadTransactions();
@@ -57,6 +61,13 @@ const TransactionsScreen = ({ onOpenAddExpense }: TransactionsScreenProps) => {
 
   const formatAmount = (value: number) =>
     `${value < 0 ? '-' : ''}₹${Math.abs(value).toLocaleString('en-IN')}`;
+
+  const handleSync = async () => {
+    if (Platform.OS !== 'android') return;
+    if (!isGranted(permissionStatus.sms)) return;
+    await readSmsAndIngest(100);
+    await loadTransactions();
+  };
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.screen}>
@@ -72,6 +83,16 @@ const TransactionsScreen = ({ onOpenAddExpense }: TransactionsScreenProps) => {
           )}
           right={(
             <View style={styles.topActions}>
+              <Pressable
+                style={[
+                  styles.syncButton,
+                  (Platform.OS !== 'android' || !isGranted(permissionStatus.sms)) &&
+                    styles.syncButtonDisabled,
+                ]}
+                onPress={handleSync}
+              >
+                <Text style={styles.syncText}>SYNC</Text>
+              </Pressable>
               <SearchIcon />
               {onOpenAddExpense ? <AddExpenseHeaderButton onPress={onOpenAddExpense} /> : null}
             </View>

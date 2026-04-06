@@ -109,26 +109,27 @@ export const generateInsights = (transactions: Transaction[]): Insight[] => {
     });
   }
 
-  const subsNow = currentByCat.Subscriptions ?? 0;
-  if (subsNow > 0) {
-    const subsMerchants = groupSum(
-      currentMonth.filter((t) => normalizeCategory(t.category) === 'Subscriptions'),
-      (t) => t.merchant || 'Subscriptions'
-    );
-    const topMerchants = Object.entries(subsMerchants)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 2)
-      .map(([name]) => name);
-    insights.push({
-      id: 'subs-total',
-      type: 'fixed_cost',
-      tag: 'FIXED COST',
-      title: `Subscriptions total ${formatCurrency(subsNow)}/mo`,
-      body: topMerchants.length
-        ? `Top services: ${topMerchants.join(', ')}.`
-        : 'Recurring digital services detected.',
-    });
-  }
+  // Subscription insights intentionally paused per Phase 3 directive.
+  // const subsNow = currentByCat.Subscriptions ?? 0;
+  // if (subsNow > 0) {
+  //   const subsMerchants = groupSum(
+  //     currentMonth.filter((t) => normalizeCategory(t.category) === 'Subscriptions'),
+  //     (t) => t.merchant || 'Subscriptions'
+  //   );
+  //   const topMerchants = Object.entries(subsMerchants)
+  //     .sort((a, b) => b[1] - a[1])
+  //     .slice(0, 2)
+  //     .map(([name]) => name);
+  //   insights.push({
+  //     id: 'subs-total',
+  //     type: 'fixed_cost',
+  //     tag: 'FIXED COST',
+  //     title: `Subscriptions total ${formatCurrency(subsNow)}/mo`,
+  //     body: topMerchants.length
+  //       ? `Top services: ${topMerchants.join(', ')}.`
+  //       : 'Recurring digital services detected.',
+  //   });
+  // }
 
   const lateNight = currentMonth.filter((t) => {
     const d = getDate(t);
