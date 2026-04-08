@@ -10,7 +10,7 @@ import {
 import { styles } from './styles';
 import { useAppStore } from '../../store/useAppStore';
 
-const imgSpotifyCover = require('../../assets/images/insights/spotify-cover.png');
+const imgSpotifyCover = require('../../assets/images/insights/spotify-cover.jpg');
 const imgVerified = require('../../assets/images/insights/verified.png');
 const imgLateNight = require('../../assets/images/insights/late-night-icon.png');
 const imgSubscriptions = require('../../assets/images/insights/subscriptions-icon.png');

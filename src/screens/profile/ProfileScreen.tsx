@@ -5,12 +5,15 @@ import {
   Linking,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   Text,
   TextInput,
   View,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import AppHeader from '../../components/AppHeader';
+import { DashboardIcon } from '../../components/transactions';
 import { styles } from './styles';
 import { formatDateInput, toDDMMYYYY, toDateFromDDMMYYYY } from '../../utils/date';
 import { useProfileStore } from '../../store/useProfileStore';
@@ -20,11 +23,12 @@ import { CalendarIcon, DatePickerModal } from '../../components/common';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { readSmsAndIngest } from '../../services/smsService';
 import { useAppStore } from '../../store/useAppStore';
+import { useAiStore } from '../../store/useAiStore';
 import { db } from '../../db/database';
 import { syncGmailTransactions } from '../../services/gmail/gmailIngestService';
 import { ENV } from '../../config/env';
 
-const imgArjun = require('../../assets/images/profile/arjun.png');
+const imgArjun = require('../../assets/images/profile/arjun.jpg');
 const imgEdit = require('../../assets/images/profile/edit.png');
 const imgTier = require('../../assets/images/profile/tier.png');
 const imgPermissions = require('../../assets/images/profile/permissions.png');
@@ -45,11 +49,28 @@ const ProfileScreen = () => {
   const { profile, updateProfile, resetProfile } = useProfileStore();
   const { status, requestAll } = usePermissionStore();
   const { loadTransactions } = useAppStore();
+  const aiStatus = useAiStore((s) => s.status);
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(profile);
   const [showPicker, setShowPicker] = useState(false);
   const [gmailSyncing, setGmailSyncing] = useState(false);
   const [gmailLastSync, setGmailLastSync] = useState<string | null>(null);
+  const [smsLastSync, setSmsLastSync] = useState<string | null>(null);
+
+  const { isSyncing, setIsSyncing } = useAppStore();
+
+  const handleSync = async () => {
+    if (Platform.OS !== 'android') return;
+    if (!isGranted(status.sms)) return;
+    setIsSyncing(true);
+    try {
+      const result = await readSmsAndIngest(100);
+      await loadTransactions();
+      setSmsLastSync(`${result.count} added · ${new Date().toLocaleTimeString()}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const startEdit = () => {
     setDraft(profile);
@@ -68,6 +89,15 @@ const ProfileScreen = () => {
 
   const avatarSource = draft.avatarUri ? { uri: draft.avatarUri } : imgArjun;
 
+  const aiStatusText =
+    aiStatus === 'ok'
+      ? 'AI quota: OK'
+      : aiStatus === 'limited'
+        ? 'AI quota: LIMITED'
+        : aiStatus === 'error'
+          ? 'AI quota: ERROR'
+          : 'AI quota: UNKNOWN';
+
   const handleDeleteAllData = () => {
     Alert.alert(
       'Delete all data?',
@@ -82,8 +112,12 @@ const ProfileScreen = () => {
             await db.executeAsync('DELETE FROM insights');
             await db.executeAsync('DELETE FROM recurring_patterns');
             await db.executeAsync('DELETE FROM rules');
+            await db.executeAsync('DELETE FROM categories');
+            await db.executeAsync('DELETE FROM sms_ai_cache');
             resetProfile();
             setDraft(defaultProfile);
+            setSmsLastSync(null);
+            setGmailLastSync(null);
             await loadTransactions();
           },
         },
@@ -101,6 +135,33 @@ const ProfileScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.screen}>
+        <AppHeader
+          title="Profile Vault"
+          left={(
+            <View style={styles.brandIcon}>
+              <DashboardIcon color="#A7AABA" />
+            </View>
+          )}
+          right={(
+            <View style={styles.topActions}>
+              <Pressable
+                style={[
+                  styles.syncButton,
+                  (Platform.OS !== 'android' || !isGranted(status.sms)) &&
+                    styles.syncButtonDisabled,
+                ]}
+                onPress={handleSync}
+                disabled={isSyncing}
+              >
+                {isSyncing ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.headerSyncText}>SYNC</Text>
+                )}
+              </Pressable>
+            </View>
+          )}
+        />
         <View style={styles.glowLeft} />
         <View style={styles.glowRight} />
         <View style={styles.glowTop} />
@@ -218,6 +279,8 @@ const ProfileScreen = () => {
             </View>
           ) : null}
 
+          {/* 
+          TODO // dont remove this
           <View style={styles.subscriptionCard}>
             <View style={styles.subscriptionGlow} />
             <View style={styles.tierRow}>
@@ -238,9 +301,10 @@ const ProfileScreen = () => {
                 <Text style={styles.priceNew}>₹499/mo</Text>
               </View>
             </View>
-          </View>
+          </View> */}
 
-          <View style={styles.permissionsCard}>
+          {/* TODO // dont remove this
+           <View style={styles.permissionsCard}>
             <View style={styles.permissionsHeader}>
               <Image source={imgPermissions} style={styles.permissionsIcon} />
               <Text style={styles.permissionsTitle}>System Permissions</Text>
@@ -284,7 +348,7 @@ const ProfileScreen = () => {
             <Pressable style={styles.primaryAction} onPress={requestAll}>
               <Text style={styles.primaryActionText}>Recheck Permissions</Text>
             </Pressable>
-          </View>
+          </View> */}
 
           <View style={styles.dataSourcesCard}>
             <View style={styles.dataSourcesHeader}>
@@ -297,6 +361,7 @@ const ProfileScreen = () => {
                 <Text style={styles.connectText}>CONNECT{`\n`}NEW</Text>
               </Pressable>
             </View>
+            {/* TODO // dont remove this
             <View style={styles.sourceCard}>
               <View style={styles.sourceInfo}>
                 <View style={styles.sourceIconWrap}>
@@ -330,7 +395,7 @@ const ProfileScreen = () => {
                   {gmailSyncing ? 'SYNCING' : 'SYNC'}
                 </Text>
               </Pressable>
-            </View>
+            </View> */}
             <View style={styles.sourceCard}>
               <View style={styles.sourceInfo}>
                 <View style={styles.sourceIconWrap}>
@@ -338,18 +403,22 @@ const ProfileScreen = () => {
                 </View>
                 <View>
                   <Text style={styles.sourceTitle}>SMS{`\n`}Telemetry</Text>
-                  <Text style={styles.sourceMeta}>Processing 424{`\n`}threads</Text>
+                  <Text style={styles.sourceMeta}>
+                    Last sync:{` `}
+                    {smsLastSync ?? 'Not synced'}
+                  </Text>
+                  <Text style={styles.sourceMeta}>{aiStatusText}</Text>
                 </View>
               </View>
               {isGranted(status.sms) ? (
                 <Pressable
                   style={styles.syncPill}
-                  onPress={async () => {
-                    await readSmsAndIngest(50);
-                    await loadTransactions();
-                  }}
+                  disabled={isSyncing}
+                  onPress={handleSync}
                 >
-                  <Text style={styles.syncText}>SYNC</Text>
+                  <Text style={styles.syncText}>
+                    {isSyncing ? 'SYNCING' : 'SYNC'}
+                  </Text>
                 </Pressable>
               ) : (
                 <View style={styles.analyzingPill}>
@@ -361,15 +430,14 @@ const ProfileScreen = () => {
             <Pressable
               style={[
                 styles.primaryAction,
-                (Platform.OS !== 'android' || !isGranted(status.sms)) && styles.disabledAction,
+                (Platform.OS !== 'android' || !isGranted(status.sms) || isSyncing) && styles.disabledAction,
               ]}
-              onPress={async () => {
-                if (Platform.OS !== 'android' || !isGranted(status.sms)) return;
-                await readSmsAndIngest(100);
-                await loadTransactions();
-              }}
+              onPress={handleSync}
+              disabled={isSyncing}
             >
-              <Text style={styles.primaryActionText}>Sync SMS Now</Text>
+              <Text style={styles.primaryActionText}>
+                {isSyncing ? 'Syncing...' : 'Sync SMS Now'}
+              </Text>
             </Pressable>
           </View>
 
@@ -380,11 +448,11 @@ const ProfileScreen = () => {
               encrypted.
             </Text>
             <View style={styles.privacyActions}>
-              <Pressable style={styles.primaryAction} onPress={handleManageLocalStorage}>
-                <Text style={styles.primaryActionText}>Manage Local Storage</Text>
+              <Pressable style={styles.privacyPrimaryAction} onPress={handleManageLocalStorage}>
+                <Text style={styles.privacyPrimaryActionText}>Manage Local Storage</Text>
               </Pressable>
-              <Pressable style={styles.dangerAction} onPress={handleDeleteAllData}>
-                <Text style={styles.dangerActionText}>Delete All Data</Text>
+              <Pressable style={styles.privacyDangerAction} onPress={handleDeleteAllData}>
+                <Text style={styles.privacyDangerActionText}>Delete All Data</Text>
               </Pressable>
             </View>
           </View>

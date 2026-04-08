@@ -34,16 +34,22 @@
 
 - ~~Integrate SMS parsing pipeline (Android only).~~
 - ~~Add manual source status into Profile (mocked at first).~~
+  - Note: iOS does not allow SMS access; SMS parsing is Android-only by platform policy.
 
 ### ~~Phase 3: Insight Engine Expansion (Completed)~~
 
-- Rules engine (food spike, subscriptions, recurring detection).
+- Rules engine (food spike, recurring detection).  
+- Subscriptions module: intentionally paused (on hold).
 - Store insights in DB and render from DB.
 
 ### Phase 4: Email Parsing (Backend) (In Progress)
 
 - Add backend pipeline for Gmail API. (done: backend skeleton + Gmail sync endpoint)
 - Sync insights back to app. (done: app Gmail sync + local insight refresh)
+- Remaining:
+  - App-side OAuth flow (in-app auth + secure token storage).
+  - Deploy backend + configure production base URL.
+  - Background/scheduled sync and error handling.
 
 ## Immediate Next Step Suggestion
 

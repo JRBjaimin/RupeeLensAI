@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Platform, Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Text, View, Alert, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../../components/AppHeader';
 import { styles } from './styles';
 import {
@@ -23,7 +24,7 @@ import { AddExpenseHeaderButton } from '../../components/addExpense';
 import { readSmsAndIngest } from '../../services/smsService';
 import { usePermissionStore } from '../../store/usePermissionStore';
 import { isGranted } from '../../services/permissionService';
-
+import { deleteTransaction } from '../../services/transactionService';
 
 type TimeFilter = 'Today' | 'Week' | 'Month';
 
@@ -32,7 +33,7 @@ type TransactionsScreenProps = {
 };
 
 const TransactionsScreen = ({ onOpenAddExpense }: TransactionsScreenProps) => {
-  const { transactions, loadTransactions } = useAppStore();
+  const { transactions, loadTransactions, isSyncing, setIsSyncing } = useAppStore();
   const [filter, setFilter] = useState<TimeFilter>('Today');
   const permissionStatus = usePermissionStore((s) => s.status);
 
@@ -65,8 +66,44 @@ const TransactionsScreen = ({ onOpenAddExpense }: TransactionsScreenProps) => {
   const handleSync = async () => {
     if (Platform.OS !== 'android') return;
     if (!isGranted(permissionStatus.sms)) return;
-    await readSmsAndIngest(100);
-    await loadTransactions();
+    setIsSyncing(true);
+    try {
+      await readSmsAndIngest(100);
+      await loadTransactions();
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    Alert.alert('Delete Transaction', 'Are you sure you want to delete this transaction?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteTransaction(id);
+          await loadTransactions();
+        },
+      },
+    ]);
+  };
+
+  const formatChannel = (txn: typeof transactions[number]) => {
+    const text = (txn.rawText ?? '').toLowerCase();
+    if (text.includes('upi')) return 'UPI';
+    if (text.includes('card') || text.includes('pos')) return 'CARD';
+    if (text.includes('imps') || text.includes('neft') || text.includes('rtgs')) return 'BANK';
+    if (text.includes('atm') || text.includes('cash')) return 'ATM';
+    return txn.source.toUpperCase();
+  };
+
+  const formatReadable = (txn: typeof transactions[number]) => {
+    if (txn.source !== 'sms') return 'MANUAL ENTRY';
+    if (txn.summary) return txn.summary;
+    const channel = formatChannel(txn);
+    const merchant = txn.merchant || 'Unknown';
+    return `${channel} • ${merchant}`;
   };
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -90,8 +127,13 @@ const TransactionsScreen = ({ onOpenAddExpense }: TransactionsScreenProps) => {
                     styles.syncButtonDisabled,
                 ]}
                 onPress={handleSync}
+                disabled={isSyncing}
               >
-                <Text style={styles.syncText}>SYNC</Text>
+                {isSyncing ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.syncText}>SYNC</Text>
+                )}
               </Pressable>
               <SearchIcon />
               {onOpenAddExpense ? <AddExpenseHeaderButton onPress={onOpenAddExpense} /> : null}
@@ -152,13 +194,15 @@ const TransactionsScreen = ({ onOpenAddExpense }: TransactionsScreenProps) => {
             <TransactionCard
               key={txn.id}
               title={txn.merchant}
-              subtitle={txn.source.toUpperCase()}
+              subtitle={formatReadable(txn)}
               meta={txn.category}
               amount={formatAmount(txn.amount)}
               time={new Date(txn.date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
               accent="#35C9FF"
               icon={<MoneyNoteIcon color="#35C9FF" />}
               useLinearIconBg
+              badge={txn.aiUsed ? 'AI' : undefined}
+              onLongPress={() => handleDelete(txn.id)}
             />
           ))}
 

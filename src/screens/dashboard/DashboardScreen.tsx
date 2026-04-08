@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View, Alert, ActivityIndicator, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AppHeader from '../../components/AppHeader';
 import BottomTabBar from '../../components/BottomTabBar';
 import { styles } from './styles';
@@ -14,6 +15,10 @@ import {
 import { DashboardIcon } from '../../components/transactions';
 import { AddExpenseHeaderButton } from '../../components/addExpense';
 import { useAppStore } from '../../store/useAppStore';
+import { deleteTransaction } from '../../services/transactionService';
+import { isGranted } from '../../services/permissionService';
+import { usePermissionStore } from '../../store/usePermissionStore';
+import { readSmsAndIngest } from '../../services/smsService.android';
 
 type DashboardScreenProps = {
   onOpenIntelligenceFeed?: () => void;
@@ -26,14 +31,33 @@ const DashboardScreen = ({
   onOpenAddExpense,
   onViewAllTransactions,
 }: DashboardScreenProps) => {
-  const { transactions, insights, loadTransactions } = useAppStore();
+  const { transactions, insights, loadTransactions, isSyncing, setIsSyncing } = useAppStore();
+  const permissionStatus = usePermissionStore((s) => s.status);
 
   React.useEffect(() => {
     loadTransactions();
   }, [loadTransactions]);
 
   const summary = useMemo(() => {
-    const total = transactions.reduce((sum, t) => sum + t.amount, 0);
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+    let thisMonthTotal = 0;
+    let lastMonthTotal = 0;
+
+    transactions.forEach((t) => {
+      const d = new Date(t.date);
+      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+        thisMonthTotal += t.amount;
+      }
+      if (d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear) {
+        lastMonthTotal += t.amount;
+      }
+    });
+
     const byCategory = transactions.reduce<Record<string, number>>((acc, t) => {
       acc[t.category] = (acc[t.category] ?? 0) + t.amount;
       return acc;
@@ -43,13 +67,14 @@ const DashboardScreen = ({
       .map(([name, amount]) => ({
         name,
         amount,
-        percent: total > 0 ? Math.round((amount / total) * 100) : 0,
+        percent: thisMonthTotal > 0 ? Math.round((amount / thisMonthTotal) * 100) : 0,
       }))
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 3);
 
     return {
-      total,
+      total: thisMonthTotal,
+      lastMonthTotal,
       recent: transactions.slice(0, 3),
       topInsight: insights[0]?.title ?? 'No insights yet. Add some transactions.',
       categories,
@@ -58,6 +83,20 @@ const DashboardScreen = ({
 
   const formatCurrency = (value: number) =>
     `₹${Math.abs(value).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+
+  const handleDelete = (id: string) => {
+    Alert.alert('Delete Transaction', 'Are you sure you want to delete this transaction?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteTransaction(id);
+          await loadTransactions();
+        },
+      },
+    ]);
+  };
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -86,6 +125,18 @@ const DashboardScreen = ({
         return '#B9A7FF';
     }
   };
+  const handleSync = async () => {
+      if (Platform.OS !== 'android') return;
+      if (!isGranted(permissionStatus.sms)) return;
+      setIsSyncing(true);
+      try {
+        await readSmsAndIngest(100);
+        await loadTransactions();
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.screen}>
@@ -99,7 +150,27 @@ const DashboardScreen = ({
               <DashboardIcon color="#A7AABA" />
             </View>
           )}
-          right={onOpenAddExpense ? <AddExpenseHeaderButton onPress={onOpenAddExpense} /> : null}
+          right={onOpenAddExpense ? 
+          
+          <View style={styles.topActions}>
+            <Pressable
+                            style={[
+                              styles.syncButton,
+                              (Platform.OS !== 'android' || !isGranted(permissionStatus.sms)) &&
+                                styles.syncButtonDisabled,
+                            ]}
+                            onPress={handleSync}
+                            disabled={isSyncing}
+                          >
+                            {isSyncing ? (
+                              <ActivityIndicator color="#FFFFFF" size="small" />
+                            ) : (
+                              <Text style={styles.syncText}>SYNC</Text>
+                            )}
+                          </Pressable>
+          <AddExpenseHeaderButton onPress={onOpenAddExpense} /> 
+          </View>
+          : null}
         />
         <ScrollView
           contentContainerStyle={styles.content}
@@ -111,17 +182,21 @@ const DashboardScreen = ({
               <Text style={styles.metricValue}>{formatCurrency(summary.total)}</Text>
             </View>
           </View>
-          <View style={styles.metricPillRow}>
-            <View style={styles.metricPill}>
-              <View style={styles.metricPillIcon}>
-                <UpTrendIcon />
-              </View>
-              <View>
-                <Text style={styles.metricPillValue}>12%</Text>
-                <Text style={styles.metricPillCaption}>vs last{'\n'}month</Text>
+          {summary.lastMonthTotal > 0 && (
+            <View style={styles.metricPillRow}>
+              <View style={styles.metricPill}>
+                <View style={styles.metricPillIcon}>
+                  <UpTrendIcon />
+                </View>
+                <View>
+                  <Text style={styles.metricPillValue}>
+                    {Math.round(Math.abs(((summary.total - summary.lastMonthTotal) / summary.lastMonthTotal) * 100))}%
+                  </Text>
+                  <Text style={styles.metricPillCaption}>vs last{'\n'}month</Text>
+                </View>
               </View>
             </View>
-          </View>
+          )}
 
           <Pressable
             onPress={onOpenIntelligenceFeed}
@@ -182,7 +257,10 @@ const DashboardScreen = ({
           </View>
 
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeaderTitle}>Recent Transactions</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.sectionHeaderTitle}>Recent Transactions</Text>
+              {isSyncing && <ActivityIndicator size="small" color="#A7AABA" style={{ marginLeft: 8 }} />}
+            </View>
             <Text
               style={styles.sectionHeaderAction}
               onPress={onViewAllTransactions}
@@ -200,6 +278,7 @@ const DashboardScreen = ({
               badge={txn.source.toUpperCase()}
               accent={getAccent(txn.category)}
               icon={getCategoryIcon(txn.category)}
+              onLongPress={() => handleDelete(txn.id)}
             />
           ))}
         </ScrollView>

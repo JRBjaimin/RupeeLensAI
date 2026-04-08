@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Text, View, Pressable } from 'react-native';
 import { styles } from '../../screens/dashboard/styles';
 
 export const TxnCard = ({
@@ -9,6 +9,7 @@ export const TxnCard = ({
   badge,
   accent,
   icon,
+  onLongPress,
 }: {
   title: string;
   subtitle: string;
@@ -16,8 +17,9 @@ export const TxnCard = ({
   badge: string;
   accent: string;
   icon: React.ReactNode;
+  onLongPress?: () => void;
 }) => (
-  <View style={[styles.txnCard, { borderColor: `${accent}55` }]}> 
+  <Pressable onLongPress={onLongPress} style={[styles.txnCard, { borderColor: `${accent}55` }]}> 
     <View style={[styles.txnIconWrap, { borderColor: `${accent}66` }]}> 
       {icon}
     </View>
@@ -29,5 +31,5 @@ export const TxnCard = ({
       <Text style={styles.txnAmount}>{amount}</Text>
       <Text style={[styles.txnBadge, { color: accent }]}>{badge}</Text>
     </View>
-  </View>
+  </Pressable>
 );

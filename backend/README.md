@@ -29,3 +29,8 @@ POST http://localhost:8787/gmail/sync
 ```
 
 The response contains parsed transactions ready for the app to ingest.
+
+## Mobile Notes
+- Android emulator uses `http://10.0.2.2:8787`
+- iOS simulator uses `http://localhost:8787`
+- For physical devices, replace the base URL with your machine IP.

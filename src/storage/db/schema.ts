@@ -4,6 +4,9 @@ export const schema = {
   amount REAL,
   merchant TEXT,
   category TEXT,
+  channel TEXT,
+  summary TEXT,
+  ai_used INTEGER,
   date TEXT,
   time TEXT,
   source TEXT,
@@ -35,5 +38,14 @@ export const schema = {
   type TEXT,
   message TEXT,
   created_at TEXT
+);`,
+  sms_ai_cache: `CREATE TABLE IF NOT EXISTS sms_ai_cache (
+  id TEXT PRIMARY KEY,
+  merchant TEXT,
+  category TEXT,
+  channel TEXT,
+  summary TEXT,
+  ai_used INTEGER,
+  updated_at TEXT
 );`,
 };

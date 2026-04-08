@@ -9,6 +9,8 @@ import { detectRecurringPatterns, saveRecurringPatterns } from '../services/recu
 type AppState = {
   transactions: Transaction[];
   insights: Insight[];
+  isSyncing: boolean;
+  setIsSyncing: (val: boolean) => void;
   loadTransactions: () => Promise<void>;
   refreshInsights: () => Promise<void>;
 };
@@ -16,6 +18,8 @@ type AppState = {
 export const useAppStore = create<AppState>((set, get) => ({
   transactions: [],
   insights: [],
+  isSyncing: false,
+  setIsSyncing: (isSyncing) => set({ isSyncing }),
   loadTransactions: async () => {
     const data = await getTransactions();
     set({ transactions: data });

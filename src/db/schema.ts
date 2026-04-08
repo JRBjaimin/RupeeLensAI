@@ -15,6 +15,9 @@ export const initDB = async () => {
       amount REAL,
       merchant TEXT,
       category TEXT,
+      channel TEXT,
+      summary TEXT,
+      ai_used INTEGER,
       date TEXT,
       created_at TEXT,
       source TEXT,
@@ -63,6 +66,21 @@ export const initDB = async () => {
     );
   `);
 
+  await db.executeAsync(`
+    CREATE TABLE IF NOT EXISTS sms_ai_cache (
+      id TEXT PRIMARY KEY,
+      merchant TEXT,
+      category TEXT,
+      channel TEXT,
+      summary TEXT,
+      ai_used INTEGER,
+      updated_at TEXT
+    );
+  `);
+
+  await safeExec(`ALTER TABLE transactions ADD COLUMN channel TEXT;`);
+  await safeExec(`ALTER TABLE transactions ADD COLUMN summary TEXT;`);
+  await safeExec(`ALTER TABLE transactions ADD COLUMN ai_used INTEGER;`);
   await safeExec(`ALTER TABLE recurring_patterns ADD COLUMN last_detected TEXT;`);
   await safeExec(`ALTER TABLE insights ADD COLUMN title TEXT;`);
   await safeExec(`ALTER TABLE insights ADD COLUMN body TEXT;`);

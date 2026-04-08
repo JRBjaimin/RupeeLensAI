@@ -13,15 +13,19 @@ export const addTransaction = async (txn: NewTransactionInput) => {
   const id = uuid.v4().toString();
   const createdAt = new Date().toISOString();
   const isRecurring = txn.isRecurring ? 1 : 0;
+  const aiUsed = txn.aiUsed ? 1 : 0;
 
   await db.executeAsync(
-    `INSERT INTO transactions (id, amount, merchant, category, date, created_at, source, raw_text, is_recurring)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO transactions (id, amount, merchant, category, channel, summary, ai_used, date, created_at, source, raw_text, is_recurring)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       txn.amount,
       txn.merchant,
       txn.category,
+      txn.channel ?? null,
+      txn.summary ?? null,
+      aiUsed,
       txn.date,
       createdAt,
       txn.source,
@@ -30,7 +34,20 @@ export const addTransaction = async (txn: NewTransactionInput) => {
     ]
   );
 
-  return { ...txn, id, createdAt, isRecurring: !!txn.isRecurring } as Transaction;
+  return {
+    ...txn,
+    id,
+    createdAt,
+    isRecurring: !!txn.isRecurring,
+    aiUsed: !!txn.aiUsed,
+  } as Transaction;
+};
+
+export const deleteTransaction = async (id: string) => {
+  await db.executeAsync(
+    `DELETE FROM transactions WHERE id = ?`,
+    [id]
+  );
 };
 
 export const getTransactions = async (): Promise<Transaction[]> => {
@@ -88,5 +105,8 @@ const mapRowToTransaction = (row: any): Transaction => ({
   source: row.source,
   rawText: row.raw_text ?? undefined,
   isRecurring: Boolean(row.is_recurring),
+  channel: row.channel ?? undefined,
+  summary: row.summary ?? undefined,
+  aiUsed: row.ai_used ? Boolean(row.ai_used) : false,
   createdAt: row.created_at ?? row.date,
 });

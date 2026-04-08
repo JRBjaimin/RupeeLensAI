@@ -1,5 +1,13 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  Easing,
+  LayoutChangeEvent,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { colors } from '../../theme';
 
@@ -10,10 +18,96 @@ type Props = {
   onTabPress: (tab: TabKey) => void;
 };
 
+const PILL_HEIGHT = 36;
+const OUTER_PADDING = 12;
+const INACTIVE_SLOT = 60;
+const ACTIVE_MIN_WIDTH = 100;
+
 const BottomTabBar = ({ activeTab, onTabPress }: Props) => {
+  const [layout, setLayout] = useState({ width: 0, height: 0 });
+  const translateX = useRef(new Animated.Value(0)).current;
+  const pillWidth = useRef(new Animated.Value(0)).current;
+  const lastTarget = useRef(0);
+
+  const slotConfig = (() => {
+    if (!layout.width) {
+      return {
+        activeWidth: ACTIVE_MIN_WIDTH,
+        slotWidths: {
+          Dashboard: INACTIVE_SLOT,
+          Lens: INACTIVE_SLOT,
+          Insights: INACTIVE_SLOT,
+          Vault: INACTIVE_SLOT,
+        } as Record<TabKey, number>,
+        centers: {
+          Dashboard: 0,
+          Lens: 0,
+          Insights: 0,
+          Vault: 0,
+        } as Record<TabKey, number>,
+      };
+    }
+
+    const innerWidth = Math.max(0, layout.width - OUTER_PADDING * 2);
+    const activeWidth = Math.max(
+      ACTIVE_MIN_WIDTH,
+      innerWidth - INACTIVE_SLOT * 3
+    );
+    const slotWidths: Record<TabKey, number> = {
+      Dashboard: activeTab === 'Dashboard' ? activeWidth : INACTIVE_SLOT,
+      Lens: activeTab === 'Lens' ? activeWidth : INACTIVE_SLOT,
+      Insights: activeTab === 'Insights' ? activeWidth : INACTIVE_SLOT,
+      Vault: activeTab === 'Vault' ? activeWidth : INACTIVE_SLOT,
+    };
+    const order: TabKey[] = ['Dashboard', 'Lens', 'Insights', 'Vault'];
+    let cursor = OUTER_PADDING;
+    const centers: Record<TabKey, number> = {
+      Dashboard: 0,
+      Lens: 0,
+      Insights: 0,
+      Vault: 0,
+    };
+    order.forEach((tab) => {
+      const width = slotWidths[tab];
+      centers[tab] = cursor + width / 2;
+      cursor += width;
+    });
+    return { activeWidth, slotWidths, centers };
+  })();
+
+  useEffect(() => {
+    const target = slotConfig.centers[activeTab];
+    const targetWidth = Math.max(86, slotConfig.activeWidth - 8);
+    if (!target || target === lastTarget.current) return;
+    lastTarget.current = target;
+    Animated.timing(translateX, {
+      toValue: target,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+    Animated.timing(pillWidth, {
+      toValue: targetWidth,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [activeTab, slotConfig, translateX, pillWidth]);
+
+  useEffect(() => {
+    const target = slotConfig.centers[activeTab];
+    if (!target) return;
+    if (lastTarget.current === 0) {
+      lastTarget.current = target;
+      translateX.setValue(target);
+      const targetWidth = Math.max(86, slotConfig.activeWidth - 8);
+      pillWidth.setValue(targetWidth);
+    }
+  }, [activeTab, slotConfig, translateX, pillWidth]);
+
   const activeLabel =
     activeTab === 'Dashboard'
-      ? 'DASHBOARD'
+      ? 'DASH'
       : activeTab === 'Lens'
         ? 'LENS'
         : activeTab === 'Insights'
@@ -21,13 +115,41 @@ const BottomTabBar = ({ activeTab, onTabPress }: Props) => {
           : 'VAULT';
 
   return (
-    <View style={styles.shell}>
+    <View
+      style={styles.shell}
+      onLayout={(event: LayoutChangeEvent) => {
+        const { width, height } = event.nativeEvent.layout;
+        setLayout({ width, height });
+      }}
+    >
+      {layout.width > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.activePill,
+            {
+              width: pillWidth,
+              height: PILL_HEIGHT,
+              transform: [
+                {
+                  translateX: Animated.subtract(
+                    translateX,
+                    Animated.divide(pillWidth, 2)
+                  ),
+                },
+              ],
+            },
+          ]}
+        />
+      ) : null}
+
       <TabItem
         tab="Dashboard"
         activeTab={activeTab}
         onPress={onTabPress}
         label={activeLabel}
         renderIcon={(color) => <DashboardIcon color={color} />}
+        slotWidth={slotConfig.slotWidths.Dashboard}
       />
       <TabItem
         tab="Lens"
@@ -35,6 +157,7 @@ const BottomTabBar = ({ activeTab, onTabPress }: Props) => {
         onPress={onTabPress}
         label={activeLabel}
         renderIcon={(color) => <LensIcon color={color} />}
+        slotWidth={slotConfig.slotWidths.Lens}
       />
       <TabItem
         tab="Insights"
@@ -42,6 +165,7 @@ const BottomTabBar = ({ activeTab, onTabPress }: Props) => {
         onPress={onTabPress}
         label={activeLabel}
         renderIcon={(color) => <InsightsIcon color={color} />}
+        slotWidth={slotConfig.slotWidths.Insights}
       />
       <TabItem
         tab="Vault"
@@ -49,6 +173,7 @@ const BottomTabBar = ({ activeTab, onTabPress }: Props) => {
         onPress={onTabPress}
         label={activeLabel}
         renderIcon={(color) => <VaultIcon color={color} />}
+        slotWidth={slotConfig.slotWidths.Vault}
       />
     </View>
   );
@@ -60,6 +185,7 @@ type TabItemProps = {
   onPress: (tab: TabKey) => void;
   label: string;
   renderIcon: (color: string) => React.ReactNode;
+  slotWidth: number;
 };
 
 const TabItem = ({
@@ -68,17 +194,24 @@ const TabItem = ({
   onPress,
   label,
   renderIcon,
+  slotWidth,
 }: TabItemProps) => {
   const isActive = tab === activeTab;
   const color = isActive ? colors.textPrimary : '#A7AABA';
   return (
-    <Pressable
-      onPress={() => onPress(tab)}
-      style={isActive ? styles.activePill : styles.iconWrap}
-    >
-      {renderIcon(color)}
-      {isActive ? <Text style={styles.activeText}>{label}</Text> : null}
-    </Pressable>
+    <View style={[styles.tabSlot, { width: slotWidth }]}>
+      <Pressable
+        onPress={() => onPress(tab)}
+        style={isActive ? styles.iconWrapActive : styles.iconWrap}
+      >
+        {renderIcon(color)}
+        {isActive ? (
+          <Text style={styles.activeText} numberOfLines={1}>
+            {label}
+          </Text>
+        ) : null}
+      </Pressable>
+    </View>
   );
 };
 
@@ -121,12 +254,12 @@ const VaultIcon = ({ color = '#A7AABA' }: { color?: string }) => (
 const styles = StyleSheet.create({
   shell: {
     width: '100%',
-    height: 68,
+    height: 62,
     borderRadius: 999,
     backgroundColor: 'rgba(16,22,36,0.98)',
-    borderColor: 'rgba(120,128,160,0.3)',
     borderWidth: 1,
-    paddingHorizontal: 24,
+    borderColor: 'rgba(120,128,160,0.3)',
+    paddingHorizontal: OUTER_PADDING,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -136,6 +269,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     elevation: 16,
   },
+  tabSlot: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   iconWrap: {
     width: 46,
     height: 46,
@@ -143,30 +280,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  activePill: {
+  iconWrapActive: {
+    minWidth: 90,
+    height: PILL_HEIGHT,
+    borderRadius: 23,
+    paddingHorizontal: 14,
+    backgroundColor: 'transparent',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 22,
-    height: 46,
+    justifyContent: 'center',
+    maxWidth: '100%',
+  },
+  activePill: {
+    position: 'absolute',
+    left: 0,
+    top: (62 - PILL_HEIGHT) / 2,
     borderRadius: 23,
-    backgroundColor: 'rgba(46,52,78,0.8)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(172,163,255,0.7)',
+    backgroundColor: 'rgba(46,52,78,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
     shadowColor: '#8D84FF',
     shadowOpacity: 0.6,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 0 },
     elevation: 8,
   },
-  activePillIdle: {
-    opacity: 0.75,
-  },
   activeText: {
     color: colors.textPrimary,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1.2,
+    letterSpacing: 0.4,
+    marginLeft: 8,
+    flexShrink: 1,
   },
 });
 

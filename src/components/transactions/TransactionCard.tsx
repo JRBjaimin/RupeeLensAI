@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Text, View } from 'react-native';
+import { Image, Text, View, Pressable } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, RadialGradient, Stop } from 'react-native-svg';
 import { styles } from '../../screens/transactions/styles';
 
@@ -16,6 +16,7 @@ export type TransactionCardProps = {
   amountPositive?: boolean;
   useLinearIconBg?: boolean;
   linearColors?: [string, string];
+  onLongPress?: () => void;
 };
 
 const TransactionCard = ({
@@ -31,9 +32,10 @@ const TransactionCard = ({
   amountPositive,
   useLinearIconBg,
   linearColors,
+  onLongPress,
 }: TransactionCardProps) => (
-  <View style={[styles.txnCard, { borderColor: `${accent}55`, shadowColor: accent }]}> 
-    <View style={[styles.iconBubble, iconImage && styles.iconBubbleImage]}>
+  <Pressable onLongPress={onLongPress} style={[styles.txnCard, { borderColor: `${accent}55`, shadowColor: accent }]}> 
+    <View style={[styles.iconBubble, iconImage ? styles.iconBubbleImage : undefined]}>
       {iconImage ? (
         <Image source={iconImage} style={styles.iconImage} />
       ) : (
@@ -65,7 +67,7 @@ const TransactionCard = ({
       </Text>
       <Text style={styles.txnTime}>{time}</Text>
     </View>
-  </View>
+  </Pressable>
 );
 
 const GradientCircle = ({ accent }: { accent: string }) => {
